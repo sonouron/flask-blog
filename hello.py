@@ -7,7 +7,7 @@ app = Flask(__name__)
 # Home page
 @app.route('/')
 @app.route('/index.html')
-def home():
+def index():
     first_name ="Ronald"
     stuff = 'This is a <strong>Bold</strong> text'
     favorites_pizza = ["Pepperoni", "Cheese","Magarita","Angeliqua",450]
