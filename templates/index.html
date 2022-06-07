@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceuil</title>
+</head>
+<body>
+    <p>
+        <h1>Bienvenu sur mon blog monsieur {{ first_name|capitalize }}</h1>
+        <p>{{stuff | safe}}</p>
+        <p> <h2>Favorites pizza:</h2>
+            {% for pizza in favorites_pizza%}
+                {% if pizza == 450%}
+                    {{pizza+100}}
+                {% else %}
+                    {{ pizza | capitalize}} <br/>
+                {% endif %}
+            {%endfor%}
+        </p>
+
+        <p>
+            {{favorites_pizza.3| reverse}}
+        </p>
+    </p>
+</body>
+</html>
