@@ -1,18 +1,19 @@
 from crypt import methods
+from enum import unique
+from operator import pos
 from flask import Flask, redirect, render_template, flash, request, url_for
+from flask_wtf import FlaskForm
+from wtforms import StringField,SubmitField,PasswordField, BooleanField, ValidationError
+from wtforms.validators import DataRequired, EqualTo, Length
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from datetime import datetime,date
 from werkzeug.security import generate_password_hash,check_password_hash
+from wtforms.widgets import TextArea
 from flask_login import UserMixin, login_user, LoginManager, login_required, logout_user,current_user
-from webforms import *
-from flask_ckeditor import CKEditor
-
 
 # Flask instance creation
 app = Flask(__name__)
-# Add Ckeditor to our app
-ckeditor = CKEditor(app)
 # Add database
 # Sqlite db
 app.config['SQLALCHEMY_DATABASE_URI']='sqlite:///users.db'
@@ -22,7 +23,7 @@ app.config['SECRET_KEY']="sonou"
 
 #Initialize the database
 db=SQLAlchemy(app)
-migrate = Migrate(app, db, render_as_batch=True)
+migrate = Migrate(app,db)
 
 # Flask Login 
 login_manager = LoginManager()
@@ -33,40 +34,6 @@ login_manager.login_view = 'login'
 def load_user(user_id):
     return Users.query.get(int(user_id))
 
-# Pass Infos to Navbar
-@app.context_processor
-def base():
-    form = SearchForm()
-    return dict(form=form)
-
-# Create search function
-@app.route('/search',methods=["POST"])
-def search():
-    form = SearchForm()
-    posts = Posts.query
-    if form.validate_on_submit():
-        # Get data from form
-        post.searched = form.searched.data
-        # Query the Database
-        posts = posts.filter(Posts.content.like('%' + post.searched + '%'))
-        posts = posts.order_by(Posts.title).all()
-        return render_template('search.html', form=form, searched=post.searched, posts=posts)
-
-"""
-Admin page
-"""
-@app.route('/admin')
-@login_required
-def admin():
-    id = current_user.id
-    if id == 1:
-        return render_template('admin.html')
-    else:
-        flash("Vous n'êtes pas l'administrateur, vous ne pouvez pas accéder à cette page")
-        return redirect(url_for('dashboard'))
-"""
-End Admin page
-"""
 
 
 """
@@ -76,43 +43,19 @@ Blog post
 class Posts(db.Model):
     id = db.Column(db.Integer,primary_key=True)
     title = db.Column(db.String(250))
-    #author = db.Column(db.String(250))
+    author = db.Column(db.String(250))
     content = db.Column(db.Text)
     date_posted = db.Column(db.DateTime,default=datetime.utcnow)
     slug = db.Column(db.String(250))
-    # Foreign Key to Link Users (refer to primary)
-    poster_id =db.Column(db.Integer,db.ForeignKey('users.id'))
 
 
-# Create Users Model on database
-class Users(db.Model,UserMixin):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(20), nullable=False, unique=True)
-    name = db.Column(db.String(200), nullable = False)
-    email = db.Column(db.String(120), nullable = False, unique=True)
-    color = db.Column(db.String(100))
-    about_author = db.Column(db.Text(400), nullable=True)
-    date_added = db.Column(db.DateTime, default = datetime.utcnow)
-    # Ajout du mot de passe
-    password_hash = db.Column(db.String(120))
-
-    # User can have many Posts
-    posts = db.relationship('Posts',backref='poster')
-
-
-    @property 
-    def password(self):
-        raise AttributeError("Le mots de passe ne peut être lu")
-    
-    @password.setter
-    def password(self,password):
-        self.password_hash = generate_password_hash(password)
-
-    def verify_pwd(self,password):
-        return check_password_hash(self.password_hash,password)
-
-    def __repr__(self):
-        return '<Name %r>' % self.name
+# Create Post form 
+class PostForm(FlaskForm):
+    title = StringField("Titre",validators=[DataRequired()])
+    content = StringField("Contenu",validators=[DataRequired()], widget=TextArea())
+    author = StringField("Auteur",validators=[DataRequired()])
+    slug = StringField("Slug",validators=[DataRequired()])
+    submit = SubmitField("Poster")
 
 
 # Post page
@@ -122,12 +65,11 @@ def add_posts():
     form = PostForm()
 
     if form.validate_on_submit():
-        poster = current_user.id
-        post = Posts(title = form.title.data, content=form.content.data,poster_id = poster, slug= form.slug.data )
+        post = Posts(title = form.title.data, content=form.content.data, author=form.author.data, slug= form.slug.data )
         # Clear The form
         form.title.data =''
         form.content.data=''
-        #form.author.data = ''
+        form.author.data = ''
         form.slug.data = ''
         
         # Add post to database
@@ -159,7 +101,7 @@ def edit_post(id):
 
     if form.validate_on_submit():
         post.title = form.title.data
-        #post.author = form.author.data
+        post.author = form.author.data
         post.slug = form.slug.data
         post.content = form.content.data
 
@@ -167,45 +109,79 @@ def edit_post(id):
         db.session.commit()
         flash("L'article a été modifier avec succès")
         return redirect(url_for('post',id=post.id))
-
-    if current_user.id == post.poster_id:
-        form.title.data = post.title
-        #form.author.data = post.author
-        form.slug.data = post.slug
-        form.content.data = post.content
-        return render_template('edit_post.html',form=form)
-
-    else:
-        flash("Vous n'êtes pas l'auteur de cet article")
-        posts = Posts.query.order_by(Posts.date_posted)
-        return render_template('posts.html',posts=posts)
+    form.title.data = post.title
+    form.author.data = post.author
+    form.slug.data = post.slug
+    form.content.data = post.content
+    return render_template('edit_post.html',form=form)
 
 # Delete a blog post
 @app.route('/posts/delete/<int:id>')
-@login_required
 def delete_post(id):
     post_to_delete=Posts.query.get_or_404(id)
-    id = current_user.id
-    if id == post_to_delete.poster.id:
-        try:
-            db.session.delete(post_to_delete)
-            db.session.commit()
-            flash('Article supprimer avec succès')
-            posts = Posts.query.order_by(Posts.date_posted)
-            return render_template('posts.html',posts=posts)
 
-        except:
-            flash('Erreur!! Veillez réessayer!!')
-            posts = Posts.query.order_by(Posts.date_posted)
-            return render_template('posts.html',posts=posts)
-    else:
-        flash("Vous ne pouvez pas supprimer cet article")
+    try:
+        db.session.delete(post_to_delete)
+        db.session.commit()
+        flash('Article supprimer avec succès')
         posts = Posts.query.order_by(Posts.date_posted)
         return render_template('posts.html',posts=posts)
+
+    except:
+        flash('Erreur!! Veillez réessayer!!')
+        posts = Posts.query.order_by(Posts.date_posted)
+        return render_template('posts.html',posts=posts)
+
 """ 
 Blog post end
 """ 
 
+# Create Users Model on database
+class Users(db.Model,UserMixin):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(20), nullable=False, unique=True)
+    name = db.Column(db.String(200), nullable = False)
+    email = db.Column(db.String(120), nullable = False, unique=True)
+    color = db.Column(db.String(100))
+    date_added = db.Column(db.DateTime, default = datetime.utcnow)
+    # Ajout du mot de passe
+    password_hash = db.Column(db.String(120))
+
+    @property
+    def password(self):
+        raise AttributeError("Le mots de passe ne peut être lu")
+    
+    @password.setter
+    def password(self,password):
+        self.password_hash = generate_password_hash(password)
+
+    def verify_pwd(self,password):
+        return check_password_hash(self.password_hash,password)
+
+    def __repr__(self):
+        return '<Name %r>' % self.name
+
+# Create a form class
+class UserForm(FlaskForm):
+    name = StringField("Nom", validators=[DataRequired()])
+    username = StringField("Username", validators=[DataRequired()])
+    email = StringField("Email", validators=[DataRequired()])
+    color = StringField("Color")
+    password_hash = PasswordField("Password",validators=[DataRequired(),EqualTo('password_hash2',message='Saisissez le même mot de passe')])
+    password_hash2 = PasswordField("Confirm Password",validators=[DataRequired()])
+    submit = SubmitField("Envoyer")
+
+
+# Create a form class
+class NamerForm(FlaskForm):
+    name = StringField("Quel est votre nom?", validators=[DataRequired()])
+    submit = SubmitField("Envoyer")
+
+# Create a password form class
+class PasswordForm(FlaskForm):
+    email = StringField("Email:", validators=[DataRequired()])
+    password_hash = PasswordField("Password:", validators=[DataRequired()])
+    submit = SubmitField("Connexion")
 
 
 # Json using
@@ -239,7 +215,6 @@ def delete(id):
 
 # Update Database
 @app.route('/update/<int:id>',methods=["GET","POST"])
-@login_required
 def update(id):
     form = UserForm()
     user_to_update = Users.query.get_or_404(id)
@@ -274,7 +249,11 @@ def index():
 """
 Login 
 """
-
+# Loginform
+class LoginForm(FlaskForm):
+    username = StringField("Username",validators=[DataRequired()])
+    password = PasswordField("Password", validators=[DataRequired()])
+    submit = SubmitField("Se connecter")
 
 # Login page 
 @app.route('/login',methods=['GET','POST'])
@@ -306,7 +285,7 @@ def dashboard():
         user_to_update.email = request.form['email']
         user_to_update.color = request.form['color']
         user_to_update.username = request.form['username']
-        user_to_update.about_author = request.form['about_author']
+
         try:
             db.session.commit()
             flash("Utilisateur modifier avec succès")

@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<br><br>
+    {% for message in get_flashed_messages() %}
+    <div class="alert alert-success alert-dismissible show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+
+    {% if id ==  current_user.id %}
+
+        <h2>Update user...</h2>
+        <br>
+        ID to update: {{ id }} <br>
+        Current ID : {{ current_user.id }}
+        <div class="shadow p-3 mb-5 bg-body rounded">
+        <form action="/update/{{ user_to_update.id}}" method="POST">
+            {{ form.hidden_tag() }}
+            {{form.name.label(class="form-label")}}
+            {{form.name(class="form-control", value=user_to_update.name)}} <br>
+
+            {{form.username.label(class="form-label")}}
+            {{form.username(class="form-control", value=user_to_update.username)}} <br>
+
+            {{form.email.label(class="form-label")}}
+            {{form.email(class="form-control", value=user_to_update.email)}} <br>
+
+            {{form.color.label(class="form-label")}}
+            {{form.color(class="form-control", value=user_to_update.color)}} <br>
+
+            {{form.submit(class="btn btn-primary")}} 
+            <a href="{{ url_for('delete',id=id) }}" class="btn btn-danger">Supprimer</a>
+        </form>
+        </div>   
+    {% else %}
+    <div class="alert alert-success alert-dismissible show" role="alert">
+         Désolé vous ne pouvez pas modifier les informations d'un autre utilisateur
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+      <h2>Accès refusé</h2>
+      Désolé vous ne pouvez pas accéder au profil d'un autre utilisateur
+    {% endif %}
+{% endblock %}
