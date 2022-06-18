@@ -1,4 +1,5 @@
 from crypt import methods
+from distutils.command.upload import upload
 from flask import Flask, redirect, render_template, flash, request, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
@@ -7,6 +8,9 @@ from werkzeug.security import generate_password_hash,check_password_hash
 from flask_login import UserMixin, login_user, LoginManager, login_required, logout_user,current_user
 from webforms import *
 from flask_ckeditor import CKEditor
+from werkzeug.utils import secure_filename
+import uuid as uuid
+import os
 
 
 # Flask instance creation
@@ -15,14 +19,20 @@ app = Flask(__name__)
 ckeditor = CKEditor(app)
 # Add database
 # Sqlite db
-app.config['SQLALCHEMY_DATABASE_URI']='sqlite:///users.db'
+#app.config['SQLALCHEMY_DATABASE_URI']='sqlite:///users.db'
+# Postgresql for Heroku
+app.config['SQLALCHEMY_DATABASE_URI']='postgres://mqxqcbrpmfpqko:cad6e13d4a031a1817994134deaccda992cf1fd135f0ad6d7d3ddda420848315@ec2-54-227-248-71.compute-1.amazonaws.com:5432/d4402f2hbruhfc'
 
 # Secret Key!!!
 app.config['SECRET_KEY']="sonou"
 
+#Initialize the database for saving images
+UPLOAD_FOLDER='static/images'
+app.config['UPLOAD_FOLDER']=UPLOAD_FOLDER
+
 #Initialize the database
 db=SQLAlchemy(app)
-migrate = Migrate(app, db, render_as_batch=True)
+migrate = Migrate(app, db)
 
 # Flask Login 
 login_manager = LoginManager()
@@ -91,11 +101,11 @@ class Users(db.Model,UserMixin):
     name = db.Column(db.String(200), nullable = False)
     email = db.Column(db.String(120), nullable = False, unique=True)
     color = db.Column(db.String(100))
-    about_author = db.Column(db.Text(400), nullable=True)
+    about_author = db.Column(db.Text(), nullable=True)
     date_added = db.Column(db.DateTime, default = datetime.utcnow)
+    profile_pic = db.Column(db.String(), nullable = True)
     # Ajout du mot de passe
     password_hash = db.Column(db.String(120))
-
     # User can have many Posts
     posts = db.relationship('Posts',backref='poster')
 
@@ -307,6 +317,17 @@ def dashboard():
         user_to_update.color = request.form['color']
         user_to_update.username = request.form['username']
         user_to_update.about_author = request.form['about_author']
+        user_to_update.profile_pic = request.files['profile_pic']
+
+        # Grab Image Name
+        pic_filename = secure_filename(user_to_update.profile_pic.filename)
+        # Set uuid 
+        pic_name = str(uuid.uuid1()) + "_" + pic_filename
+        #Save Image
+        user_to_update.profile_pic.save(os.path.join(app.config['UPLOAD_FOLDER'],pic_name))
+        # Change it to a string to save to db
+        user_to_update.profile_pic = pic_name
+
         try:
             db.session.commit()
             flash("Utilisateur modifier avec succès")

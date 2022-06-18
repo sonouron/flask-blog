@@ -25,6 +25,7 @@
                       <strong>Color:</strong> {{ current_user.color }} <br>
                       <strong>User ID:</strong> {{ current_user.id }} <br>
                       <strong>Joined date:</strong> {{ current_user.date_added }} <br>
+                      <strong>Profile pic:</strong> {{ current_user.profile_pic }} <br>
                       <strong>A propos de l'auteur:</strong> {{ current_user.about_author }} <br>
                     </p>
                       <a href="{{ url_for('logout')}}" class="btn btn-outline-warning btn-sm">Déconnexion</a>
@@ -32,7 +33,11 @@
                       <a href="{{ url_for('delete',id=current_user.id) }}" class="btn btn-outline-danger btn-sm">Supprimer</a><br><br>
                     </div>
                     <div class="col-4">
+                      {% if current_user.profile_pic %}
+                      <img src="{{ url_for('static', filename='images/' + current_user.profile_pic) }}" alt="Profil pic" width="150" align="right">
+                      {% else %}
                       <img src="{{ url_for('static', filename='images/profile.png') }}" alt="Profil pic" width="150" align="right">
+                      {% endif %}
                     </div>
                   </div>
                 </div>
@@ -44,7 +49,7 @@
                Modifier votre profil
             </div>
             <div class="card-body">
-              <form action="/dashboard" method="POST">
+              <form action="/dashboard" method="POST" enctype="multipart/form-data">
                 {{ form.hidden_tag() }}
                 {{form.name.label(class="form-label")}}
                 {{form.name(class="form-control", value=user_to_update.name)}} <br>
@@ -61,6 +66,9 @@
                 <textarea name="about_author" class="form-control" rows="4">{{ user_to_update.about_author }}
                 </textarea> <br>
 
+                {{form.profile_pic.label(class="form-label")}}
+                {{form.profile_pic(class="form-control", value=user_to_update.profile_pic)}} <br>
+    
                 {{form.submit(class="btn btn-primary")}} 
             </form>
             </div>
